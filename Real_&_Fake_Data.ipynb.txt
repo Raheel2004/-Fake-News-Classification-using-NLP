@@ -1,0 +1,1271 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "gpuType": "V28"
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    },
+    "accelerator": "TPU"
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "979b72de"
+      },
+      "source": [
+        "# Task\n",
+        "Design and implement a Fake News Detection system using NLP techniques. The system should involve data preprocessing, exploratory data analysis, feature engineering (BoW, TF-IDF, and word embeddings), and training and evaluating at least two classical machine learning models (Logistic Regression, Multinomial Naive Bayes, or SVM). Optionally, explore deep learning techniques using BERT or LSTM. The project should utilize the \"Fake and Real News Dataset\"."
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "e3a7a446"
+      },
+      "source": [
+        "## Load and preprocess data\n",
+        "\n",
+        "### Subtask:\n",
+        "Load the fake and real news datasets, combine them, handle missing values and duplicates, and preprocess the text data (lowercase, remove punctuation, tokenize, remove stopwords, and lemmatize/stem).\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "cd163864"
+      },
+      "source": [
+        "**Reasoning**:\n",
+        "Load the fake and real news datasets, add labels, concatenate them, and perform initial data cleaning steps including handling missing values and duplicates, and converting text to lowercase.\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "356a168e"
+      },
+      "source": [
+        "import pandas as pd\n",
+        "import numpy as np\n",
+        "import re\n",
+        "import nltk\n",
+        "from nltk.corpus import stopwords\n",
+        "from nltk.stem import WordNetLemmatizer\n",
+        "\n",
+        "#1. Choose a Dataset\n",
+        "import pandas as pd\n",
+        "from google.colab import drive\n",
+        "\n",
+        "# Mount Google Drive\n",
+        "drive.mount('/content/drive')\n",
+        "\n",
+        "# Update the path to your CSV file\n",
+        "# Make sure the file 'kaggle datasets.csv' is in the root of your Google Drive\n",
+        "# Load the datasets\n",
+        "df_fake = pd.read_csv('/content/drive/MyDrive/Fake.csv')\n",
+        "df_real = pd.read_csv('/content/drive/MyDrive/True.csv')\n",
+        "\n",
+        "# Add label columns\n",
+        "df_fake['label'] = 1\n",
+        "df_real['label'] = 0\n",
+        "\n",
+        "# Concatenate the dataframes\n",
+        "data = pd.concat([df_fake, df_real], ignore_index=True)\n",
+        "\n",
+        "# Handle missing values (check and drop if any, as per common practice for this dataset)\n",
+        "data.dropna(inplace=True)\n",
+        "\n",
+        "# Handle duplicate rows\n",
+        "data.drop_duplicates(inplace=True)\n",
+        "\n",
+        "# Convert text to lowercase\n",
+        "data['text'] = data['text'].str.lower()\n",
+        "\n",
+        "display(data.head())"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "7c8ee980"
+      },
+      "source": [
+        "**Reasoning**:\n",
+        "The previous attempt failed because the file 'Fake.csv' was not found. The dataframes `df_fake` and `df_real` are already available in the environment from the initial state. I should use those existing dataframes instead of trying to load them again. Then I will proceed with adding labels, concatenating the dataframes, handling missing values and duplicates, and converting text to lowercase.\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "zmexUOqS8eae"
+      },
+      "source": [
+        "import re\n",
+        "import nltk\n",
+        "from nltk.corpus import stopwords\n",
+        "from nltk.stem import WordNetLemmatizer\n",
+        "\n",
+        "# The dataframes df_fake and df_real are already loaded.\n",
+        "\n",
+        "# Add label columns\n",
+        "df_fake['label'] = 1\n",
+        "df_real['label'] = 0\n",
+        "\n",
+        "# Concatenate the dataframes\n",
+        "data = pd.concat([df_fake, df_real], ignore_index=True)\n",
+        "\n",
+        "# Handle missing values (check and drop if any, as per common practice for this dataset)\n",
+        "data.dropna(inplace=True)\n",
+        "\n",
+        "# Handle duplicate rows\n",
+        "data.drop_duplicates(inplace=True)\n",
+        "\n",
+        "# Convert text to lowercase\n",
+        "data['text'] = data['text'].str.lower()\n",
+        "\n",
+        "display(data.head())"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "a0b4ec5e"
+      },
+      "source": [
+        "**Reasoning**:\n",
+        "Continue with the text preprocessing steps by removing punctuation, tokenizing, removing stopwords, and applying lemmatization to the 'text' column. Finally, join the processed tokens back into strings.\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "4e43ffba"
+      },
+      "source": [
+        "# Remove punctuation\n",
+        "data['text'] = data['text'].apply(lambda x: re.sub(r'[^\\w\\s]', '', x))\n",
+        "\n",
+        "# Tokenize the text\n",
+        "data['text'] = data['text'].apply(lambda x: x.split())\n",
+        "\n",
+        "# Download necessary NLTK data\n",
+        "try:\n",
+        "    stopwords_list = stopwords.words('english')\n",
+        "    lemmatizer = WordNetLemmatizer()\n",
+        "except LookupError:\n",
+        "    nltk.download('stopwords')\n",
+        "    nltk.download('wordnet')\n",
+        "    stopwords_list = stopwords.words('english')\n",
+        "    lemmatizer = WordNetLemmatizer()\n",
+        "\n",
+        "\n",
+        "# Remove stopwords and lemmatize\n",
+        "def preprocess_text(text):\n",
+        "    return [lemmatizer.lemmatize(word) for word in text if word not in stopwords_list]\n",
+        "\n",
+        "data['text'] = data['text'].apply(preprocess_text)\n",
+        "\n",
+        "# Join the tokens back into strings\n",
+        "data['text'] = data['text'].apply(lambda x: ' '.join(x))\n",
+        "\n",
+        "display(data.head())"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "75ea84ad"
+      },
+      "source": [
+        "## Exploratory data analysis (eda)\n",
+        "\n",
+        "### Subtask:\n",
+        "Analyze the processed data to understand class distribution, identify frequent terms, and compare linguistic features.\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "d346b0df"
+      },
+      "source": [
+        "**Reasoning**:\n",
+        "Calculate and visualize the distribution of fake and real news articles in the `data` DataFrame.\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "77fc48d0"
+      },
+      "source": [
+        "import matplotlib.pyplot as plt\n",
+        "import seaborn as sns\n",
+        "\n",
+        "plt.figure(figsize=(6, 4))\n",
+        "sns.countplot(x='label', data=data)\n",
+        "plt.title('Distribution of Fake (1) and Real (0) News Articles')\n",
+        "plt.xlabel('Label')\n",
+        "plt.ylabel('Number of Articles')\n",
+        "plt.xticks([0, 1], ['Real', 'Fake'])\n",
+        "plt.show()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "ddbcb4a7"
+      },
+      "source": [
+        "**Reasoning**:\n",
+        "Identify and visualize the most frequent terms in the preprocessed text for both fake and real news categories separately.\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "9d2a950d"
+      },
+      "source": [
+        "from collections import Counter\n",
+        "\n",
+        "# Get text for fake and real news\n",
+        "fake_text = ' '.join(data[data['label'] == 1]['text']).split()\n",
+        "real_text = ' '.join(data[data['label'] == 0]['text']).split()\n",
+        "\n",
+        "# Get most frequent words\n",
+        "fake_word_counts = Counter(fake_text)\n",
+        "real_word_counts = Counter(real_text)\n",
+        "\n",
+        "top_n = 20\n",
+        "most_common_fake_words = fake_word_counts.most_common(top_n)\n",
+        "most_common_real_words = real_word_counts.most_common(top_n)\n",
+        "\n",
+        "# Visualize most frequent words\n",
+        "fig, axes = plt.subplots(1, 2, figsize=(15, 7))\n",
+        "\n",
+        "sns.barplot(x=[word for word, count in most_common_fake_words], y=[count for word, count in most_common_fake_words], ax=axes[0])\n",
+        "axes[0].set_title(f'Top {top_n} Most Frequent Words in Fake News')\n",
+        "axes[0].set_xlabel('Words')\n",
+        "axes[0].set_ylabel('Frequency')\n",
+        "axes[0].tick_params(axis='x', rotation=90)\n",
+        "\n",
+        "sns.barplot(x=[word for word, count in most_common_real_words], y=[count for word, count in most_common_real_words], ax=axes[1])\n",
+        "axes[1].set_title(f'Top {top_n} Most Frequent Words in Real News')\n",
+        "axes[1].set_xlabel('Words')\n",
+        "axes[1].set_ylabel('Frequency')\n",
+        "axes[1].tick_params(axis='x', rotation=90)\n",
+        "\n",
+        "plt.tight_layout()\n",
+        "plt.show()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "38d769d7"
+      },
+      "source": [
+        "**Reasoning**:\n",
+        "Compare linguistic features between fake and real news, focusing on word count as a proxy for length, and visualize their distributions.\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "070588ee"
+      },
+      "source": [
+        "# Calculate word count for each article\n",
+        "data['word_count'] = data['text'].apply(lambda x: len(x.split()))\n",
+        "\n",
+        "# Visualize the distribution of word counts for fake and real news\n",
+        "plt.figure(figsize=(10, 6))\n",
+        "sns.histplot(data=data, x='word_count', hue='label', kde=True, common_norm=False)\n",
+        "plt.title('Distribution of Word Counts in Fake (1) and Real (0) News Articles')\n",
+        "plt.xlabel('Word Count')\n",
+        "plt.ylabel('Frequency')\n",
+        "plt.legend(title='Label', labels=['Real', 'Fake'])\n",
+        "plt.show()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "a531923c"
+      },
+      "source": [
+        "## Feature engineering\n",
+        "\n",
+        "### Subtask:\n",
+        "Convert the preprocessed text into numerical features using Bag of Words (BoW) and TF-IDF vectorization.\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "e124074f"
+      },
+      "source": [
+        "**Reasoning**:\n",
+        "Import the necessary vectorizers from scikit-learn and then apply them to the text data to create the Bag of Words and TF-IDF representations.\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "943593bc"
+      },
+      "source": [
+        "from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer\n",
+        "\n",
+        "# Initialize and apply CountVectorizer (Bag of Words)\n",
+        "count_vectorizer = CountVectorizer()\n",
+        "X_bow = count_vectorizer.fit_transform(data['text'])\n",
+        "\n",
+        "# Initialize and apply TfidfVectorizer (TF-IDF)\n",
+        "tfidf_vectorizer = TfidfVectorizer()\n",
+        "X_tfidf = tfidf_vectorizer.fit_transform(data['text'])\n",
+        "\n",
+        "# Optionally print the shapes\n",
+        "print(\"Shape of Bag of Words matrix:\", X_bow.shape)\n",
+        "print(\"Shape of TF-IDF matrix:\", X_tfidf.shape)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "bb075b1d"
+      },
+      "source": [
+        "## Model training and evaluation (classical ml)\n",
+        "\n",
+        "### Subtask:\n",
+        "Train and evaluate at least two classical machine learning models (Logistic Regression, Multinomial Naive Bayes, or SVM) using the engineered features.\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "3110370c"
+      },
+      "source": [
+        "**Reasoning**:\n",
+        "Split the data into training and testing sets for both BoW and TF-IDF features, initialize and train a Logistic Regression model on BoW features, make predictions, and evaluate its performance.\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "aba4c809"
+      },
+      "source": [
+        "from sklearn.model_selection import train_test_split\n",
+        "from sklearn.linear_model import LogisticRegression\n",
+        "from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score\n",
+        "\n",
+        "# Split the data for BoW features\n",
+        "X_bow_train, X_bow_test, y_train, y_test = train_test_split(X_bow, data['label'], test_size=0.2, random_state=42)\n",
+        "\n",
+        "# Split the data for TF-IDF features (using the same split for consistency in evaluation)\n",
+        "X_tfidf_train, X_tfidf_test, _, _ = train_test_split(X_tfidf, data['label'], test_size=0.2, random_state=42)\n",
+        "\n",
+        "# Initialize and train Logistic Regression model on BoW features\n",
+        "lr_model = LogisticRegression(max_iter=1000) # Increased max_iter for convergence\n",
+        "lr_model.fit(X_bow_train, y_train)\n",
+        "\n",
+        "# Make predictions on the BoW test set\n",
+        "y_pred_lr_bow = lr_model.predict(X_bow_test)\n",
+        "\n",
+        "# Evaluate Logistic Regression model\n",
+        "accuracy_lr_bow = accuracy_score(y_test, y_pred_lr_bow)\n",
+        "precision_lr_bow = precision_score(y_test, y_pred_lr_bow)\n",
+        "recall_lr_bow = recall_score(y_test, y_pred_lr_bow)\n",
+        "f1_lr_bow = f1_score(y_test, y_pred_lr_bow)\n",
+        "\n",
+        "print(\"Logistic Regression (BoW) Performance:\")\n",
+        "print(f\"Accuracy: {accuracy_lr_bow:.4f}\")\n",
+        "print(f\"Precision: {precision_lr_bow:.4f}\")\n",
+        "print(f\"Recall: {recall_lr_bow:.4f}\")\n",
+        "print(f\"F1-score: {f1_lr_bow:.4f}\")"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "f9fca382"
+      },
+      "source": [
+        "**Reasoning**:\n",
+        "Initialize and train a Multinomial Naive Bayes model using the training data from the TF-IDF features, make predictions on the test set, and evaluate its performance.\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "aeff1966"
+      },
+      "source": [
+        "from sklearn.naive_bayes import MultinomialNB\n",
+        "\n",
+        "# Initialize and train Multinomial Naive Bayes model on TF-IDF features\n",
+        "mnb_model = MultinomialNB()\n",
+        "mnb_model.fit(X_tfidf_train, y_train)\n",
+        "\n",
+        "# Make predictions on the TF-IDF test set\n",
+        "y_pred_mnb_tfidf = mnb_model.predict(X_tfidf_test)\n",
+        "\n",
+        "# Evaluate Multinomial Naive Bayes model\n",
+        "accuracy_mnb_tfidf = accuracy_score(y_test, y_pred_mnb_tfidf)\n",
+        "precision_mnb_tfidf = precision_score(y_test, y_pred_mnb_tfidf)\n",
+        "recall_mnb_tfidf = recall_score(y_test, y_pred_mnb_tfidf)\n",
+        "f1_mnb_tfidf = f1_score(y_test, y_pred_mnb_tfidf)\n",
+        "\n",
+        "print(\"\\nMultinomial Naive Bayes (TF-IDF) Performance:\")\n",
+        "print(f\"Accuracy: {accuracy_mnb_tfidf:.4f}\")\n",
+        "print(f\"Precision: {precision_mnb_tfidf:.4f}\")\n",
+        "print(f\"Recall: {recall_mnb_tfidf:.4f}\")\n",
+        "print(f\"F1-score: {f1_mnb_tfidf:.4f}\")"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "f88c6f2c"
+      },
+      "source": [
+        "## Feature engineering (word embeddings)\n",
+        "\n",
+        "### Subtask:\n",
+        "Convert the preprocessed text into numerical features using word embeddings (Word2Vec, GloVe, or contextualized embeddings via BERT).\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "c4fb7a30"
+      },
+      "source": [
+        "**Reasoning**:\n",
+        "Train a Word2Vec model on the preprocessed text data and create a function to average the word vectors for each document.\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "JaXwMmDc9iO-"
+      },
+      "source": [
+        "%pip install gensim"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "d5532523"
+      },
+      "source": [
+        "**Reasoning**:\n",
+        "Now that gensim is installed, train the Word2Vec model and generate the document embeddings.\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "8ac07fa6"
+      },
+      "source": [
+        "from gensim.models import Word2Vec\n",
+        "import numpy as np\n",
+        "\n",
+        "# Split the text data into a list of lists of words for Word2Vec training\n",
+        "tokenized_text = [text.split() for text in data['text']]\n",
+        "\n",
+        "# Train a Word2Vec model\n",
+        "# min_count=1 ensures that words with frequency 1 are included\n",
+        "# vector_size=100 sets the dimension of the word vectors\n",
+        "word2vec_model = Word2Vec(sentences=tokenized_text, vector_size=100, window=5, min_count=1, workers=4)\n",
+        "\n",
+        "# Function to average word vectors for a document\n",
+        "def document_vector(doc):\n",
+        "    # Filter out words not in the vocabulary\n",
+        "    words = [word for word in doc if word in word2vec_model.wv.index_to_key]\n",
+        "    if not words:\n",
+        "        return np.zeros(word2vec_model.wv.vector_size)\n",
+        "    # Average the word vectors\n",
+        "    return np.mean(word2vec_model.wv[words], axis=0)\n",
+        "\n",
+        "# Apply the function to generate document embeddings\n",
+        "X_word_embeddings = np.array([document_vector(text.split()) for text in data['text']])\n",
+        "\n",
+        "print(\"Shape of document embeddings matrix:\", X_word_embeddings.shape)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "16020bd8"
+      },
+      "source": [
+        "**Reasoning**:\n",
+        "The previous command failed because the `data` DataFrame is not defined in the current session. This indicates a potential issue with the notebook state or variable persistence across cells. I will re-execute the code that loads and preprocesses the data to ensure the `data` DataFrame is available before proceeding with Word2Vec training.\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "s8bkT5qt9rFN"
+      },
+      "source": [
+        "import re\n",
+        "import nltk\n",
+        "from nltk.corpus import stopwords\n",
+        "from nltk.stem import WordNetLemmatizer\n",
+        "import pandas as pd # Import pandas here as it might not be available\n",
+        "\n",
+        "# Assuming df_fake and df_real are available from the initial state\n",
+        "# If not, you might need to load them from CSVs here.\n",
+        "# Example:\n",
+        "# df_fake = pd.read_csv('Fake.csv')\n",
+        "# df_real = pd.read_csv('True.csv')\n",
+        "\n",
+        "\n",
+        "# Add label columns\n",
+        "df_fake['label'] = 1\n",
+        "df_real['label'] = 0\n",
+        "\n",
+        "# Concatenate the dataframes\n",
+        "data = pd.concat([df_fake, df_real], ignore_index=True)\n",
+        "\n",
+        "# Handle missing values (check and drop if any, as per common practice for this dataset)\n",
+        "data.dropna(inplace=True)\n",
+        "\n",
+        "# Handle duplicate rows\n",
+        "data.drop_duplicates(inplace=True)\n",
+        "\n",
+        "# Convert text to lowercase\n",
+        "data['text'] = data['text'].str.lower()\n",
+        "\n",
+        "# Remove punctuation\n",
+        "data['text'] = data['text'].apply(lambda x: re.sub(r'[^\\w\\s]', '', x))\n",
+        "\n",
+        "# Tokenize the text\n",
+        "data['text'] = data['text'].apply(lambda x: x.split())\n",
+        "\n",
+        "# Download necessary NLTK data\n",
+        "try:\n",
+        "    stopwords_list = stopwords.words('english')\n",
+        "    lemmatizer = WordNetLemmatizer()\n",
+        "except LookupError:\n",
+        "    nltk.download('stopwords')\n",
+        "    nltk.download('wordnet')\n",
+        "    stopwords_list = stopwords.words('english')\n",
+        "    lemmatizer = WordNetLemmatizer()\n",
+        "\n",
+        "\n",
+        "# Remove stopwords and lemmatize\n",
+        "def preprocess_text(text):\n",
+        "    return [lemmatizer.lemmatize(word) for word in text if word not in stopwords_list]\n",
+        "\n",
+        "data['text'] = data['text'].apply(preprocess_text)\n",
+        "\n",
+        "# Join the tokens back into strings\n",
+        "data['text'] = data['text'].apply(lambda x: ' '.join(x))\n",
+        "\n",
+        "# Now proceed with Word2Vec training\n",
+        "from gensim.models import Word2Vec\n",
+        "import numpy as np\n",
+        "\n",
+        "# Split the text data into a list of lists of words for Word2Vec training\n",
+        "tokenized_text = [text.split() for text in data['text']]\n",
+        "\n",
+        "# Train a Word2Vec model\n",
+        "word2vec_model = Word2Vec(sentences=tokenized_text, vector_size=100, window=5, min_count=1, workers=4)\n",
+        "\n",
+        "# Function to average word vectors for a document\n",
+        "def document_vector(doc):\n",
+        "    words = [word for word in doc if word in word2vec_model.wv.index_to_key]\n",
+        "    if not words:\n",
+        "        return np.zeros(word2vec_model.wv.vector_size)\n",
+        "    return np.mean(word2vec_model.wv[words], axis=0)\n",
+        "\n",
+        "# Apply the function to generate document embeddings\n",
+        "X_word_embeddings = np.array([document_vector(text.split()) for text in data['text']])\n",
+        "\n",
+        "print(\"Shape of document embeddings matrix:\", X_word_embeddings.shape)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "ef9bb875"
+      },
+      "source": [
+        "**Reasoning**:\n",
+        "The previous command failed because `df_fake` and `df_real` are not defined. This indicates that the initial data loading step was not preserved or accessible. I need to explicitly load the data from the CSV files before proceeding with preprocessing and Word2Vec training.\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "1vDg-DYs9tjq"
+      },
+      "source": [
+        "import pandas as pd\n",
+        "import re\n",
+        "import nltk\n",
+        "from nltk.corpus import stopwords\n",
+        "from nltk.stem import WordNetLemmatizer\n",
+        "from gensim.models import Word2Vec\n",
+        "import numpy as np\n",
+        "\n",
+        "# Load the datasets\n",
+        "try:\n",
+        "    df_fake = pd.read_csv('Fake.csv')\n",
+        "    df_real = pd.read_csv('True.csv')\n",
+        "except FileNotFoundError:\n",
+        "    print(\"Make sure 'Fake.csv' and 'True.csv' are in the correct directory.\")\n",
+        "    # Exit or handle the error appropriately\n",
+        "    # For now, let's assume the files are found and continue\n",
+        "\n",
+        "# Add label columns\n",
+        "df_fake['label'] = 1\n",
+        "df_real['label'] = 0\n",
+        "\n",
+        "# Concatenate the dataframes\n",
+        "data = pd.concat([df_fake, df_real], ignore_index=True)\n",
+        "\n",
+        "# Handle missing values (check and drop if any, as per common practice for this dataset)\n",
+        "data.dropna(inplace=True)\n",
+        "\n",
+        "# Handle duplicate rows\n",
+        "data.drop_duplicates(inplace=True)\n",
+        "\n",
+        "# Convert text to lowercase\n",
+        "data['text'] = data['text'].str.lower()\n",
+        "\n",
+        "# Remove punctuation\n",
+        "data['text'] = data['text'].apply(lambda x: re.sub(r'[^\\w\\s]', '', x))\n",
+        "\n",
+        "# Tokenize the text\n",
+        "data['text'] = data['text'].apply(lambda x: x.split())\n",
+        "\n",
+        "# Download necessary NLTK data\n",
+        "try:\n",
+        "    stopwords_list = stopwords.words('english')\n",
+        "    lemmatizer = WordNetLemmatizer()\n",
+        "except LookupError:\n",
+        "    nltk.download('stopwords')\n",
+        "    nltk.download('wordnet')\n",
+        "    stopwords_list = stopwords.words('english')\n",
+        "    lemmatizer = WordNetLemmatizer()\n",
+        "\n",
+        "\n",
+        "# Remove stopwords and lemmatize\n",
+        "def preprocess_text(text):\n",
+        "    return [lemmatizer.lemmatize(word) for word in text if word not in stopwords_list]\n",
+        "\n",
+        "data['text'] = data['text'].apply(preprocess_text)\n",
+        "\n",
+        "# Join the tokens back into strings\n",
+        "data['text'] = data['text'].apply(lambda x: ' '.join(x))\n",
+        "\n",
+        "# Now proceed with Word2Vec training\n",
+        "\n",
+        "# Split the text data into a list of lists of words for Word2Vec training\n",
+        "tokenized_text = [text.split() for text in data['text']]\n",
+        "\n",
+        "# Train a Word2Vec model\n",
+        "word2vec_model = Word2Vec(sentences=tokenized_text, vector_size=100, window=5, min_count=1, workers=4)\n",
+        "\n",
+        "# Function to average word vectors for a document\n",
+        "def document_vector(doc):\n",
+        "    words = [word for word in doc if word in word2vec_model.wv.index_to_key]\n",
+        "    if not words:\n",
+        "        return np.zeros(word2vec_model.wv.vector_size)\n",
+        "    return np.mean(word2vec_model.wv[words], axis=0)\n",
+        "\n",
+        "# Apply the function to generate document embeddings\n",
+        "X_word_embeddings = np.array([document_vector(text.split()) for text in data['text']])\n",
+        "\n",
+        "print(\"Shape of document embeddings matrix:\", X_word_embeddings.shape)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "bd564951"
+      },
+      "source": [
+        "**Reasoning**:\n",
+        "The previous attempt to load the data failed because the CSV files were not found. Since the problem description states that the dataframes `df_fake` and `df_real` are available from the initial state, I will assume they exist and proceed with the preprocessing and Word2Vec training steps, excluding the file loading part that caused the error.\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "q7u0XR859wAN"
+      },
+      "source": [
+        "import re\n",
+        "import nltk\n",
+        "from nltk.corpus import stopwords\n",
+        "from nltk.stem import WordNetLemmatizer\n",
+        "# Assuming df_fake and df_real are already loaded in the environment\n",
+        "\n",
+        "# Add label columns\n",
+        "df_fake['label'] = 1\n",
+        "df_real['label'] = 0\n",
+        "\n",
+        "# Concatenate the dataframes\n",
+        "data = pd.concat([df_fake, df_real], ignore_index=True)\n",
+        "\n",
+        "# Handle missing values (check and drop if any, as per common practice for this dataset)\n",
+        "data.dropna(inplace=True)\n",
+        "\n",
+        "# Handle duplicate rows\n",
+        "data.drop_duplicates(inplace=True)\n",
+        "\n",
+        "# Convert text to lowercase\n",
+        "data['text'] = data['text'].str.lower()\n",
+        "\n",
+        "# Remove punctuation\n",
+        "data['text'] = data['text'].apply(lambda x: re.sub(r'[^\\w\\s]', '', x))\n",
+        "\n",
+        "# Tokenize the text\n",
+        "data['text'] = data['text'].apply(lambda x: x.split())\n",
+        "\n",
+        "# Download necessary NLTK data (already handled in previous steps, but kept for robustness)\n",
+        "try:\n",
+        "    stopwords_list = stopwords.words('english')\n",
+        "    lemmatizer = WordNetLemmatizer()\n",
+        "except LookupError:\n",
+        "    nltk.download('stopwords')\n",
+        "    nltk.download('wordnet')\n",
+        "    stopwords_list = stopwords.words('english')\n",
+        "    lemmatizer = WordNetLemmatizer()\n",
+        "\n",
+        "\n",
+        "# Remove stopwords and lemmatize\n",
+        "def preprocess_text(text):\n",
+        "    return [lemmatizer.lemmatize(word) for word in text if word not in stopwords_list]\n",
+        "\n",
+        "data['text'] = data['text'].apply(preprocess_text)\n",
+        "\n",
+        "# Join the tokens back into strings\n",
+        "data['text'] = data['text'].apply(lambda x: ' '.join(x))\n",
+        "\n",
+        "# Now proceed with Word2Vec training\n",
+        "from gensim.models import Word2Vec\n",
+        "import numpy as np\n",
+        "\n",
+        "# Split the text data into a list of lists of words for Word2Vec training\n",
+        "tokenized_text = [text.split() for text in data['text']]\n",
+        "\n",
+        "# Train a Word2Vec model\n",
+        "word2vec_model = Word2Vec(sentences=tokenized_text, vector_size=100, window=5, min_count=1, workers=4)\n",
+        "\n",
+        "# Function to average word vectors for a document\n",
+        "def document_vector(doc):\n",
+        "    words = [word for word in doc if word in word2vec_model.wv.index_to_key]\n",
+        "    if not words:\n",
+        "        return np.zeros(word2vec_model.wv.vector_size)\n",
+        "    return np.mean(word2vec_model.wv[words], axis=0)\n",
+        "\n",
+        "# Apply the function to generate document embeddings\n",
+        "X_word_embeddings = np.array([document_vector(text.split()) for text in data['text']])\n",
+        "\n",
+        "print(\"Shape of document embeddings matrix:\", X_word_embeddings.shape)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "737fc0bd"
+      },
+      "source": [
+        "**Reasoning**:\n",
+        "The previous attempts to access `df_fake` and `df_real` have failed repeatedly, indicating that these dataframes are not available in the current environment, despite the initial prompt suggesting they were. I will assume there is an issue with the notebook state and load the data from the CSV files explicitly, as this was the original method for obtaining the data. I will then proceed with the preprocessing and Word2Vec training steps.\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "GZbddLFf9y15"
+      },
+      "source": [
+        "import pandas as pd\n",
+        "import re\n",
+        "import nltk\n",
+        "from nltk.corpus import stopwords\n",
+        "from nltk.stem import WordNetLemmatizer\n",
+        "from gensim.models import Word2Vec\n",
+        "import numpy as np\n",
+        "\n",
+        "# Load the datasets - Explicitly loading the data from CSV files\n",
+        "try:\n",
+        "    df_fake = pd.read_csv('Fake.csv')\n",
+        "    df_real = pd.read_csv('True.csv')\n",
+        "except FileNotFoundError:\n",
+        "    print(\"Error: Make sure 'Fake.csv' and 'True.csv' are in the correct directory.\")\n",
+        "    # If files are not found, we cannot proceed.\n",
+        "    # In a real scenario, you might raise an exception or log an error.\n",
+        "    # For this task, I will use finish_task with failure status if files are not found.\n",
+        "    # Assuming files are found and proceeding with the rest of the code.\n",
+        "\n",
+        "\n",
+        "# Add label columns\n",
+        "df_fake['label'] = 1\n",
+        "df_real['label'] = 0\n",
+        "\n",
+        "# Concatenate the dataframes\n",
+        "data = pd.concat([df_fake, df_real], ignore_index=True)\n",
+        "\n",
+        "# Handle missing values (check and drop if any, as per common practice for this dataset)\n",
+        "data.dropna(inplace=True)\n",
+        "\n",
+        "# Handle duplicate rows\n",
+        "data.drop_duplicates(inplace=True)\n",
+        "\n",
+        "# Convert text to lowercase\n",
+        "data['text'] = data['text'].str.lower()\n",
+        "\n",
+        "# Remove punctuation\n",
+        "data['text'] = data['text'].apply(lambda x: re.sub(r'[^\\w\\s]', '', x))\n",
+        "\n",
+        "# Tokenize the text\n",
+        "data['text'] = data['text'].apply(lambda x: x.split())\n",
+        "\n",
+        "# Download necessary NLTK data (already handled in previous steps, but kept for robustness)\n",
+        "try:\n",
+        "    stopwords_list = stopwords.words('english')\n",
+        "    lemmatizer = WordNetLemmatizer()\n",
+        "except LookupError:\n",
+        "    nltk.download('stopwords')\n",
+        "    nltk.download('wordnet')\n",
+        "    stopwords_list = stopwords.words('english')\n",
+        "    lemmatizer = WordNetLemmatizer()\n",
+        "\n",
+        "\n",
+        "# Remove stopwords and lemmatize\n",
+        "def preprocess_text(text):\n",
+        "    return [lemmatizer.lemmatize(word) for word in text if word not in stopwords_list]\n",
+        "\n",
+        "data['text'] = data['text'].apply(preprocess_text)\n",
+        "\n",
+        "# Join the tokens back into strings\n",
+        "data['text'] = data['text'].apply(lambda x: ' '.join(x))\n",
+        "\n",
+        "# Now proceed with Word2Vec training\n",
+        "\n",
+        "# Split the text data into a list of lists of words for Word2Vec training\n",
+        "tokenized_text = [text.split() for text in data['text']]\n",
+        "\n",
+        "# Train a Word2Vec model\n",
+        "word2vec_model = Word2Vec(sentences=tokenized_text, vector_size=100, window=5, min_count=1, workers=4)\n",
+        "\n",
+        "# Function to average word vectors for a document\n",
+        "def document_vector(doc):\n",
+        "    words = [word for word in doc if word in word2vec_model.wv.index_to_key]\n",
+        "    if not words:\n",
+        "        return np.zeros(word2vec_model.wv.vector_size)\n",
+        "    return np.mean(word2vec_model.wv[words], axis=0)\n",
+        "\n",
+        "# Apply the function to generate document embeddings\n",
+        "X_word_embeddings = np.array([document_vector(text.split()) for text in data['text']])\n",
+        "\n",
+        "print(\"Shape of document embeddings matrix:\", X_word_embeddings.shape)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "b6e10137"
+      },
+      "source": [
+        "## Feature engineering (word embeddings)\n",
+        "\n",
+        "### Subtask:\n",
+        "Retry: Feature engineering (word embeddings)\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "2e98d004"
+      },
+      "source": [
+        "**Reasoning**:\n",
+        "I will now implement the word embedding feature engineering. The `data` dataframe is already available from previous steps, so I will start by tokenizing the 'text' column. Then I will train a Word2Vec model on the tokenized text and use it to create document embeddings. Finally, I will print the shape of the resulting embeddings matrix to verify the result.\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "632035f9"
+      },
+      "source": [
+        "from gensim.models import Word2Vec\n",
+        "import numpy as np\n",
+        "\n",
+        "# Tokenize the 'text' column\n",
+        "tokenized_text = data['text'].apply(lambda x: x.split())\n",
+        "\n",
+        "# Train a Word2Vec model\n",
+        "word2vec_model = Word2Vec(tokenized_text, vector_size=100, window=5, min_count=1, workers=4)\n",
+        "\n",
+        "# Function to average word vectors for a document\n",
+        "def document_vector(doc, model):\n",
+        "    # remove out-of-vocabulary words\n",
+        "    doc = [word for word in doc if word in model.wv.index_to_key]\n",
+        "    if len(doc) == 0:\n",
+        "        return np.zeros(model.vector_size)\n",
+        "    else:\n",
+        "        return np.mean(model.wv[doc], axis=0)\n",
+        "\n",
+        "# Create document embeddings\n",
+        "X_word_embeddings = np.array([document_vector(text, word2vec_model) for text in tokenized_text])\n",
+        "\n",
+        "# Print the shape of the embeddings array\n",
+        "print(X_word_embeddings.shape)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "f4a29941"
+      },
+      "source": [
+        "**Reasoning**:\n",
+        "The error indicates that the `data` DataFrame is not available. I need to recreate the `data` DataFrame by loading and preprocessing the data again, as the previous state was lost. I will then proceed with tokenizing the text, training the Word2Vec model, and generating the document embeddings.\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "B5I_6W4a96vt"
+      },
+      "source": [
+        "import pandas as pd\n",
+        "import re\n",
+        "import nltk\n",
+        "from nltk.corpus import stopwords\n",
+        "from nltk.stem import WordNetLemmatizer\n",
+        "from gensim.models import Word2Vec\n",
+        "import numpy as np\n",
+        "\n",
+        "# Load the datasets - Explicitly loading the data from CSV files\n",
+        "try:\n",
+        "    df_fake = pd.read_csv('Fake.csv')\n",
+        "    df_real = pd.read_csv('True.csv')\n",
+        "except FileNotFoundError:\n",
+        "    print(\"Error: Make sure 'Fake.csv' and 'True.csv' are in the correct directory.\")\n",
+        "    # If files are not found, we cannot proceed.\n",
+        "    # In a real scenario, you might raise an exception or log an error.\n",
+        "    # For this task, I will use finish_task with failure status if files are not found.\n",
+        "\n",
+        "\n",
+        "# Add label columns\n",
+        "df_fake['label'] = 1\n",
+        "df_real['label'] = 0\n",
+        "\n",
+        "# Concatenate the dataframes\n",
+        "data = pd.concat([df_fake, df_real], ignore_index=True)\n",
+        "\n",
+        "# Handle missing values (check and drop if any, as per common practice for this dataset)\n",
+        "data.dropna(inplace=True)\n",
+        "\n",
+        "# Handle duplicate rows\n",
+        "data.drop_duplicates(inplace=True)\n",
+        "\n",
+        "# Convert text to lowercase\n",
+        "data['text'] = data['text'].str.lower()\n",
+        "\n",
+        "# Remove punctuation\n",
+        "data['text'] = data['text'].apply(lambda x: re.sub(r'[^\\w\\s]', '', x))\n",
+        "\n",
+        "# Tokenize the text\n",
+        "data['text'] = data['text'].apply(lambda x: x.split())\n",
+        "\n",
+        "# Download necessary NLTK data (already handled in previous steps, but kept for robustness)\n",
+        "try:\n",
+        "    stopwords_list = stopwords.words('english')\n",
+        "    lemmatizer = WordNetLemmatizer()\n",
+        "except LookupError:\n",
+        "    nltk.download('stopwords')\n",
+        "    nltk.download('wordnet')\n",
+        "    stopwords_list = stopwords.words('english')\n",
+        "    lemmatizer = WordNetLemmatizer()\n",
+        "\n",
+        "\n",
+        "# Remove stopwords and lemmatize\n",
+        "def preprocess_text(text):\n",
+        "    return [lemmatizer.lemmatize(word) for word in text if word not in stopwords_list]\n",
+        "\n",
+        "data['text'] = data['text'].apply(preprocess_text)\n",
+        "\n",
+        "# Now proceed with Word2Vec training\n",
+        "\n",
+        "# Split the text data into a list of lists of words for Word2Vec training\n",
+        "tokenized_text = data['text'] # data['text'] is already tokenized into lists of words\n",
+        "\n",
+        "# Train a Word2Vec model\n",
+        "word2vec_model = Word2Vec(sentences=tokenized_text, vector_size=100, window=5, min_count=1, workers=4)\n",
+        "\n",
+        "# Function to average word vectors for a document\n",
+        "def document_vector(doc, model):\n",
+        "    words = [word for word in doc if word in model.wv.index_to_key]\n",
+        "    if not words:\n",
+        "        return np.zeros(model.wv.vector_size)\n",
+        "    return np.mean(model.wv[words], axis=0)\n",
+        "\n",
+        "# Apply the function to generate document embeddings\n",
+        "X_word_embeddings = np.array([document_vector(text, word2vec_model) for text in tokenized_text])\n",
+        "\n",
+        "print(\"Shape of document embeddings matrix:\", X_word_embeddings.shape)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "2d3f376c"
+      },
+      "source": [
+        "## Model training and evaluation (deep learning - optional)\n",
+        "\n",
+        "### Subtask:\n",
+        "Train and evaluate deep learning models like LSTM or use BERT for classification (optional as per the project description).\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "1a7c8cf7"
+      },
+      "source": [
+        "**Reasoning**:\n",
+        "Import necessary deep learning libraries, prepare the data for LSTM by tokenizing and padding sequences, build and compile an LSTM model, and then train it. Since the data loading failed in the previous step, I will include the data loading and preprocessing steps again to ensure the data is available.\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "650ef690"
+      },
+      "source": [
+        "import tensorflow as tf\n",
+        "from tensorflow.keras.preprocessing.text import Tokenizer\n",
+        "from tensorflow.keras.preprocessing.sequence import pad_sequences\n",
+        "from tensorflow.keras.models import Sequential\n",
+        "from tensorflow.keras.layers import Embedding, LSTM, Dense, Dropout\n",
+        "from sklearn.model_selection import train_test_split\n",
+        "from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score\n",
+        "import pandas as pd\n",
+        "import re\n",
+        "import nltk\n",
+        "from nltk.corpus import stopwords\n",
+        "from nltk.stem import WordNetLemmatizer\n",
+        "import numpy as np\n",
+        "\n",
+        "# --- Data Loading and Preprocessing (Repeated for robustness) ---\n",
+        "try:\n",
+        "    df_fake = pd.read_csv('Fake.csv')\n",
+        "    df_real = pd.read_csv('True.csv')\n",
+        "except FileNotFoundError:\n",
+        "    print(\"Error: Make sure 'Fake.csv' and 'True.csv' are in the correct directory.\")\n",
+        "    # If files are not found, the task cannot be completed.\n",
+        "    # We'll finish with failure in the next step if data is not loaded.\n",
+        "\n",
+        "# Check if dataframes were loaded\n",
+        "if 'df_fake' not in locals() or 'df_real' not in locals():\n",
+        "    # Indicate failure to load data\n",
+        "    data_loaded = False\n",
+        "else:\n",
+        "    data_loaded = True\n",
+        "    # Add label columns\n",
+        "    df_fake['label'] = 1\n",
+        "    df_real['label'] = 0\n",
+        "\n",
+        "    # Concatenate the dataframes\n",
+        "    data = pd.concat([df_fake, df_real], ignore_index=True)\n",
+        "\n",
+        "    # Handle missing values\n",
+        "    data.dropna(inplace=True)\n",
+        "\n",
+        "    # Handle duplicate rows\n",
+        "    data.drop_duplicates(inplace=True)\n",
+        "\n",
+        "    # Convert text to lowercase\n",
+        "    data['text'] = data['text'].str.lower()\n",
+        "\n",
+        "    # Remove punctuation\n",
+        "    data['text'] = data['text'].apply(lambda x: re.sub(r'[^\\w\\s]', '', x))\n",
+        "\n",
+        "    # Tokenize the text\n",
+        "    data['text'] = data['text'].apply(lambda x: x.split())\n",
+        "\n",
+        "    # Download necessary NLTK data\n",
+        "    try:\n",
+        "        stopwords_list = stopwords.words('english')\n",
+        "        lemmatizer = WordNetLemmatizer()\n",
+        "    except LookupError:\n",
+        "        nltk.download('stopwords')\n",
+        "        nltk.download('wordnet')\n",
+        "        stopwords_list = stopwords.words('english')\n",
+        "        lemmatizer = WordNetLemmatizer()\n",
+        "\n",
+        "\n",
+        "    # Remove stopwords and lemmatize\n",
+        "    def preprocess_text(text):\n",
+        "        return [lemmatizer.lemmatize(word) for word in text if word not in stopwords_list]\n",
+        "\n",
+        "    data['text'] = data['text'].apply(preprocess_text)\n",
+        "\n",
+        "    # Join the tokens back into strings for tokenizer\n",
+        "    data['text'] = data['text'].apply(lambda x: ' '.join(x))\n",
+        "\n",
+        "    # --- Data Preparation for LSTM ---\n",
+        "    vocab_size = 10000 # Example vocabulary size\n",
+        "    embedding_dim = 128 # Example embedding dimension\n",
+        "    max_length = 200 # Example maximum sequence length\n",
+        "    trunc_type='post'\n",
+        "    padding_type='post'\n",
+        "    oov_tok = \"<OOV>\" # Out of vocabulary token\n",
+        "\n",
+        "    tokenizer = Tokenizer(num_words=vocab_size, oov_token=oov_tok)\n",
+        "    tokenizer.fit_on_texts(data['text'])\n",
+        "    word_index = tokenizer.word_index\n",
+        "\n",
+        "    sequences = tokenizer.texts_to_sequences(data['text'])\n",
+        "    padded_sequences = pad_sequences(sequences, maxlen=max_length, padding=padding_type, truncating=trunc_type)\n",
+        "\n",
+        "    # Split data\n",
+        "    X_train, X_test, y_train, y_test = train_test_split(padded_sequences, data['label'], test_size=0.2, random_state=42)\n",
+        "\n",
+        "    # Convert labels to numpy arrays\n",
+        "    y_train = np.array(y_train)\n",
+        "    y_test = np.array(y_test)\n",
+        "\n",
+        "    # --- Build and Compile LSTM Model ---\n",
+        "    model = Sequential([\n",
+        "        Embedding(vocab_size, embedding_dim, input_length=max_length),\n",
+        "        LSTM(64), # LSTM layer with 64 units\n",
+        "        Dense(64, activation='relu'), # Dense layer\n",
+        "        Dropout(0.5), # Dropout for regularization\n",
+        "        Dense(1, activation='sigmoid') # Output layer for binary classification\n",
+        "    ])\n",
+        "\n",
+        "    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])\n",
+        "\n",
+        "    model.summary()\n",
+        "\n",
+        "    # --- Train the Model ---\n",
+        "    num_epochs = 5 # Example number of epochs\n",
+        "    history = model.fit(X_train, y_train, epochs=num_epochs, validation_data=(X_test, y_test), verbose=1)\n",
+        "\n",
+        "    # --- Evaluate the Model ---\n",
+        "    loss, accuracy = model.evaluate(X_test, y_test, verbose=0)\n",
+        "    y_pred_prob = model.predict(X_test)\n",
+        "    y_pred = (y_pred_prob > 0.5).astype(\"int32\")\n",
+        "\n",
+        "    precision = precision_score(y_test, y_pred)\n",
+        "    recall = recall_score(y_test, y_pred)\n",
+        "    f1 = f1_score(y_test, y_pred)\n",
+        "\n",
+        "    print(\"\\nLSTM Model Evaluation:\")\n",
+        "    print(f\"Loss: {loss:.4f}\")\n",
+        "    print(f\"Accuracy: {accuracy:.4f}\")\n",
+        "    print(f\"Precision: {precision:.4f}\")\n",
+        "    print(f\"Recall: {recall:.4f}\")\n",
+        "    print(f\"F1-score: {f1:.4f}\")\n"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "3a320f51"
+      },
+      "source": [
+        "## Summary:\n",
+        "\n",
+        "### Data Analysis Key Findings\n",
+        "\n",
+        "*   The dataset contains a relatively balanced distribution of fake and real news articles.\n",
+        "*   Analysis of frequent terms shows that real news articles tend to use terms related to official entities and factual reporting, while fake news articles often contain terms associated with sensationalism and speculation.\n",
+        "*   Real news articles generally have a wider range of word counts and are often longer than fake news articles.\n",
+        "*   Both Bag of Words (BoW) and TF-IDF vectorization methods generated a large number of features (122002 features) from the text data.\n",
+        "*   The Logistic Regression model trained on BoW features achieved very high performance metrics (Accuracy: 0.9971, Precision: 0.9968, Recall: 0.9977, F1-score: 0.9973).\n",
+        "*   The Multinomial Naive Bayes model trained on TF-IDF features also performed well, but slightly lower than the Logistic Regression model with BoW (Accuracy: 0.9399, Precision: 0.9366, Recall: 0.9510, F1-score: 0.9438).\n",
+        "*   Attempts to implement word embeddings (Word2Vec) and a deep learning model (LSTM) failed due to `FileNotFoundError` when trying to load the source CSV files (`Fake.csv` and `True.csv`).\n",
+        "\n",
+        "### Insights or Next Steps\n",
+        "\n",
+        "*   The classical machine learning models, particularly Logistic Regression with BoW, show excellent performance on this dataset, suggesting that simpler models and feature engineering techniques are highly effective for this fake news detection task.\n",
+        "*   To explore word embeddings and deep learning models, ensure the `Fake.csv` and `True.csv` files are accessible in the correct directory to allow for successful data loading and processing.\n"
+      ]
+    }
+  ]
+}
